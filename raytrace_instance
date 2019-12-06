@@ -1,0 +1,72 @@
+/// This is a partial snippet from my raytrace code. It walks through built blocks, the floor, 
+// and instances. I've cut out the part that only checks for instance collisions. Only works with rectangle BBoxes
+
+///@param x
+///@param y
+///@param z
+///@param vector_x
+///@param vector_y
+///@param vector_z
+///@param length
+
+// xyz = origin of ray
+// vector_x/y/z = normalized vector of ray
+
+var _x = argument0;
+var _y = argument1;
+var _z = argument2;
+
+var _vx = argument3;
+var _vy = argument4;
+var _vz = argument5;
+
+var l = argument6; // Max length of the ray
+
+var lc = 0;
+var tx = _x;
+var ty = _y;
+var tz = _z;
+var trx = 0; // Probably unused? I'm doing some step-by-step cube intersections for checking built objects in chunks which is not here..
+var try = 0;
+var trz = 0;
+
+// First use a 2D check to add instances that potentially collide (i just have a much bigger 2D sprite for collisions there)
+var list = ds_list_create();
+var hitlist = ds_priority_create();
+collision_line_list(tx, ty, tx+_vx*l, ty+_vy*l, obj_box_collideable, true, true, list, false); //@todo check if order can help here for less ray box intersect checks
+var s = ds_list_size(list);
+for (var i = 0; i < s; i++) {
+	var inst = list[| i];
+
+	// Move everything to point 0;
+	var rox = tx - inst.x;
+	var roy = ty - inst.y;
+	var roz = tz - inst.z;
+	
+	var rdx = (tx+_vx*l) - inst.x;
+	var rdy = (ty+_vy*l) - inst.y;
+	var rdz = (tz+_vz*l) - inst.z;
+
+  /// Rotate the ray to the inverse matrix of the rotation of the instance. This turns a rotated rectangle into a simple AABB test
+	var ro = matrix_transform_vertex(matrix_build(0, 0, 0, -inst.xrot, -inst.yrot, -inst.zrot, 1, 1, 1), rox, roy, roz);
+	var rd = matrix_transform_vertex(matrix_build(0, 0, 0, -inst.xrot, -inst.yrot, -inst.zrot, 1, 1, 1), rdx, rdy, rdz);
+
+	var intersect = ray_intersect_box(ro, rd, [inst.bbox_x_min, inst.bbox_y_min, inst.bbox_z_min], [inst.bbox_x_max, inst.bbox_y_max, inst.bbox_z_max]);
+	if (intersect > 0) {
+		ds_priority_add(hitlist, inst, intersect);
+	}
+}
+
+var closest = ds_priority_find_min(hitlist);
+var closestDist = l*10;
+if (closest != undefined) {
+	var closestDist = ds_priority_find_priority(hitlist, closest);
+}
+
+if (closestDist > l) {
+	closest = undefined;
+	closestDist = l*10;
+}
+
+ds_list_destroy(list);
+ds_priority_destroy(hitlist);
